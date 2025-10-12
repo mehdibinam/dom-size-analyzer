@@ -1,1 +1,1 @@
-# dom-size-analyzer
+# Dom Size Analyzer Extention
