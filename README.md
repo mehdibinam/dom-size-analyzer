@@ -1,5 +1,3 @@
-# Dom Size Analyzer Extention
-
 # 🧩 DOM Size Analyzer
 **DOM Size Analyzer** is a lightweight browser extension (or DevTools panel) that helps web developers inspect and optimize the size and structure of the DOM tree on any webpage.
 
