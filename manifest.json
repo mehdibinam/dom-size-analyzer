@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "Dom Size Analyzer",
+  "description": "Chrome DevTools panel for analyzing DOM size, depth, and structure",
+  "version": "2.1.0",
+  "minimum_chrome_version": "109",
+  "devtools_page": "devtools.html",
+  "permissions": [
+    "scripting",
+    "tabs",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "injectable.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "background": {
+    "service_worker": "backgroundScript.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "run_at": "document_end",
+      "js": [
+        "contentScript.js"
+      ]
+    }
+  ]
+}

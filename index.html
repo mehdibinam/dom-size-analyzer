@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8"/>
+  <title>Dom Size Analyzer</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: light-dark(#ffffff, #0f172a);
+      --panel: light-dark(#f1f5f9, #1e293b);
+      --text: light-dark(#111827, #f1f5f9);
+      --muted: light-dark(#6b7280, #94a3b8);
+      --accent: #3b82f6;
+      --line: light-dark(#d1d5db, #475569);
+      --card: light-dark(#ffffff, #2f3e52);
+      --ok: #10b981;
+      --warn: #f59e0b;
+      --err: #ef4444;
+    }
+    html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto;font-size:15px;}
+    #app{display:flex;height:100%;}
+    .sidebar{width:440px;border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;}
+    .toolbar{padding:10px;display:flex;gap:8px;align-items:center;border-bottom:1px solid var(--line);}
+    .btn{background:#475569;color:var(--text);border:1px solid #64748b;padding:8px 12px;border-radius:10px;cursor:pointer;font-size:13px;}
+    .btn:hover{border-color:#94a3b8;}
+    .btn.primary{background:#2563eb;border-color:#1d4ed8;}
+    .btn.ghost{background:transparent;border-color:#64748b;}
+    .panel{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+    .panel-header{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);}
+    .spacer{flex:1;}
+    .chip{background:var(--chip);padding:6px 10px;border-radius:999px;font-size:12px;color:var(--muted);white-space:nowrap;}
+    .content{flex:1;display:flex;min-height:0;}
+    .tree{flex:1;overflow-y:auto;overflow-x:hidden;padding:10px 14px;}
+    .metrics{padding:10px 12px;overflow:auto;background:var(--panel);border-top:1px solid var(--line);}
+    ul{list-style:none;padding-left:14px;margin:0;}li{margin:2px 0;}
+    .node{cursor:pointer;display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;width:100%;font-size:15px;line-height:1.3;}
+    .node:hover{background:#475569;}.node.selected{outline:1px solid #64748b;}
+    .node .tag{color:#93c5fd;}.node .id{color:#34d399;}.node .cls{color:#fca5a5;}
+    .small{color:var(--muted);font-size:12px;}
+    .kpi{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;}
+    .row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:6px 0;}
+    .row .desc{min-width:0;flex:1 1 auto;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+    .taglist{display:flex;flex-wrap:wrap;gap:6px;}
+    .tagitem{background:var(--card);border:1px dashed #475569;padding:4px 8px;border-radius:8px;font-size:12px;cursor:pointer;user-select:none;}
+    .tagitem.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+    .search{min-width:260px;padding:8px 12px;border-radius:10px;border:1px solid #64748b;background:transparent;color:var(--text);}
+    .sidebar-section{padding:12px;display:flex;flex-direction:column;gap:10px;}
+    .sidebar-title{padding:10px 12px;border-bottom:1px solid var(--line);font-weight:600;}
+    .hx-green{background:rgba(16,185,129,0.15);}.hx-yellow{background:rgba(245,158,11,0.15);}.hx-orange{background:rgba(234,88,12,0.15);}.hx-red{background:rgba(239,68,68,0.15);}
+    .hamburger{display:flex;flex-direction:column;gap:2px;cursor:pointer;margin-right:6px;}
+    .hamburger span{width:14px;height:2px;background:var(--text);border-radius:1px;}
+    .hamburger span:nth-child(2){width:10px;}.hamburger span:nth-child(3){width:8px;}
+    .progress-wrapper{position:relative;height:8px;background:#475569;border-radius:4px;margin-top:6px;overflow:hidden;}
+    .progress-segment{position:absolute;height:100%;}
+    .progress-segment:nth-child(1){left:0;width:33.33%;background:var(--ok);}
+    .progress-segment:nth-child(2){left:33.33%;width:33.33%;background:var(--warn);}
+    .progress-segment:nth-child(3){left:66.66%;width:33.34%;background:var(--err);}
+    .progress-marker{position:absolute;top:-4px;width:16px;height:16px;border-radius:50%;background:var(--text);border:2px solid var(--accent);transform:translateX(-50%);}
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="sidebar">
+    <div class="sidebar-title">Controls</div>
+    <div class="sidebar-section">
+      <div id="metrics" class="metrics card">
+        <!-- static skeleton while waiting for data -->
+        <div class="kpi">
+          <div class="card"><div class="small">Total nodes</div><div style="font-size:20px">—</div></div>
+          <div class="card"><div class="small">Max depth</div><div style="font-size:20px">—</div></div>
+          <div class="card"><div class="small">Inline styles</div><div style="font-size:20px">—</div></div>
+          <div class="card"><div class="small">Attributes</div><div style="font-size:20px">—</div></div>
+        </div>
+        <div class="card" style="margin-top:10px"><div class="row"><strong>DOM Status</strong></div>
+          <div class="progress-wrapper">
+            <div class="progress-segment"></div><div class="progress-segment"></div><div class="progress-segment"></div>
+            <div class="progress-marker" style="left:0%"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:10px"><div class="row"><strong>Tag distribution</strong></div>
+          <div class="taglist"><span class="tagitem">—</span></div>
+        </div>
+        <div class="card" style="margin-top:10px"><div class="row"><strong>Heaviest nodes</strong><span class="small">Top 10</span></div>
+          <div>—</div>
+        </div>
+      </div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <span class="small">History</span>
+          <div style="display:flex;gap:8px">
+            <button class="btn" id="btnSnapshot">Snapshot</button>
+            <button class="btn" id="btnCompare">Compare last 2</button>
+            <button class="btn" id="btnClearHistory" title="Clear history">🗑️</button>
+          </div>
+        </div>
+        <div id="historyList" class="taglist" style="margin-top:8px"></div>
+      </div>
+      <div style="margin-top:auto;text-align:center;padding:10px;">
+
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <div class="hamburger" id="btnCollapseAll" title="Toggle tree">
+        <span></span><span></span><span></span>
+      </div>
+      <button class="btn" id="btnExportJson">Export JSON</button>
+      <button class="btn" id="btnExportCsv">Export CSV</button>
+      <input id="searchInput" class="search" placeholder="Search tag, #id or .class…" />
+      <span class="spacer"></span>
+      <button class="btn primary" id="btnAnalyze">Analyze DOM</button>
+        <a href="https://github.com/mehdibinam/" target="_blank" style="display:inline-block;width:24px;height:24px;background:url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%233b82f6\'><path d=\'M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.91 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z\'/></svg>') no-repeat center/contain;"></a>
+
+      <!-- status chip removed -->
+    </div>
+    <div class="content">
+      <div class="tree" id="tree"></div>
+    </div>
+  </div>
+</div>
+<script src="main.js" defer></script>
+</body>
+</html>
