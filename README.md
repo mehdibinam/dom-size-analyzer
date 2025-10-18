@@ -78,3 +78,6 @@ ________________________
 * افزونه ممکن است در برخی مرورگرها یا نسخه‌های خاص با محدودیت‌هایی مواجه شود (به‌خاطر مجوزها یا قابلیت‌های DevTools)
 <img width="1919" height="900" alt="full-dom-size-analyzer" src="https://github.com/user-attachments/assets/62c4a9d6-cd17-46f4-944b-3f76ccd9cf7b" />
 <img width="395" height="708" alt="control dom size" src="https://github.com/user-attachments/assets/37b394bd-9932-484f-92fc-7a9e2a78a5e5" />
+
+Create an issue in the GitHub repository
+Built with ❤️ for cafe owners and managers
