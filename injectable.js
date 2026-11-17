@@ -1,12 +1,9 @@
 // injectable.js – runs in page context
-
 (function () {
   const BUS_KEY = 'DOM_SIZE_ANALYZER_V2';
 
   const TYPES = {
     GET_DOM_DETAILS: 'GET_DOM_DETAILS',
-    HIGHLIGHT_ELEMENT: 'HIGHLIGHT_ELEMENT',
-    REMOVE_HIGHLIGHT: 'REMOVE_HIGHLIGHT',
     PING: 'ping',
   };
 
@@ -17,41 +14,6 @@
       return this.elementsArray.push(el) - 1;
     }
   };
-
-  // Overlay for highlight
-  function ensureOverlay() {
-    let ov = document.getElementById('domCountAnalyzerOverlay');
-    if (!ov) {
-      ov = document.createElement('div');
-      ov.id = 'domCountAnalyzerOverlay';
-      ov.style.zIndex = '2147483647';
-      ov.style.background = 'rgba(96, 165, 250, 0.35)';
-      ov.style.outline = '2px solid rgba(59,130,246,0.8)';
-      ov.style.display = 'none';
-      ov.style.position = 'absolute';
-      ov.style.pointerEvents = 'none';
-      document.body.appendChild(ov);
-    }
-    return ov;
-  }
-  ensureOverlay();
-
-  function scrollAndOverlay(el) {
-    if (!el || typeof el.getBoundingClientRect !== 'function') return;
-    try { el.scrollIntoView({ block: 'center', inline: 'center' }); } catch (_) {}
-    const r = el.getBoundingClientRect();
-    const ov = ensureOverlay();
-    ov.style.display = 'block';
-    ov.style.top = `${r.top + window.scrollY}px`;
-    ov.style.left = `${r.left + window.scrollX}px`;
-    ov.style.width = `${Math.max(0, r.width)}px`;
-    ov.style.height = `${Math.max(0, r.height)}px`;
-  }
-
-  function hideOverlay() {
-    const ov = ensureOverlay();
-    ov.style.display = 'none';
-  }
 
   function generateNodeDescription(n = {}) {
     const { id, class: cls } = n;
@@ -94,10 +56,7 @@
 
     // Metrics
     const flat = [];
-    (function walk(n) {
-      flat.push(n);
-      (n.childNodes || []).forEach(walk);
-    })(domTree);
+    (function walk(n) { flat.push(n); (n.childNodes || []).forEach(walk); })(domTree);
 
     const totalNodes = flat.length;
     const maxDepth = Math.max(...flat.map(n => n.depth || 0));
@@ -117,8 +76,7 @@
       .slice(0, 10)
       .map(n => ({ desc: generateNodeDescription(n), descendantsCount: n.descendantsCount, uniqueIndex: n.uniqueIndex }));
 
-    // Warning level heuristics
-    // 0 good, 1 medium, 2 heavy
+    // Warning heuristics
     let warningLevel = 0;
     if (totalNodes > 1500 || maxDepth > 25 || inlineStyleCount > 200) warningLevel = 2;
     else if (totalNodes > 800 || maxDepth > 18 || inlineStyleCount > 100) warningLevel = 1;
@@ -126,13 +84,7 @@
     return {
       dom: domTree,
       metrics: {
-        totalNodes,
-        maxDepth,
-        tagCounts,
-        inlineStyleCount,
-        totalAttributes,
-        heavyNodesTop,
-        warningLevel
+        totalNodes, maxDepth, tagCounts, inlineStyleCount, totalAttributes, heavyNodesTop, warningLevel
       }
     };
   }
@@ -145,17 +97,7 @@
   }
 
   const handlers = {
-    [TYPES.GET_DOM_DETAILS]: () => {
-      const result = collect(document.body || document.documentElement);
-      return result;
-    },
-    [TYPES.HIGHLIGHT_ELEMENT]: ({ uniqueElementIndex }) => {
-      const el = window[BUS_KEY].elementsArray[uniqueElementIndex];
-      scrollAndOverlay(el);
-    },
-    [TYPES.REMOVE_HIGHLIGHT]: () => {
-      hideOverlay();
-    },
+    [TYPES.GET_DOM_DETAILS]: () => collect(document.body || document.documentElement),
     [TYPES.PING]: () => true
   };
 

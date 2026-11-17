@@ -1,10 +1,7 @@
-// main.js – DevTools panel logic (no build step)
+// main.js – DevTools panel logic (updated per requests)
 
-// --- Constants
 const TYPES = {
   GET_DOM_DETAILS: 'GET_DOM_DETAILS',
-  HIGHLIGHT_ELEMENT: 'HIGHLIGHT_ELEMENT',
-  REMOVE_HIGHLIGHT: 'REMOVE_HIGHLIGHT',
   PING: 'ping',
 };
 
@@ -13,12 +10,12 @@ const port = chrome.runtime.connect({ name: 'dom-size-analyzer:devtools' });
 
 const state = {
   dom: null,
-  flat: [], // flattened nodes for search/index
+  flat: [],
   selectedUniqueIndex: null,
-  snapshots: [], // history of last analyses
+  snapshots: [],
 };
 
-// --- UI elements
+// UI refs
 const treeEl = document.getElementById('tree');
 const metricsEl = document.getElementById('metrics');
 const statusChip = document.getElementById('statusChip');
@@ -27,14 +24,11 @@ const btnAnalyze = document.getElementById('btnAnalyze');
 const btnRefresh = document.getElementById('btnRefresh');
 const btnExportJson = document.getElementById('btnExportJson');
 const btnExportCsv = document.getElementById('btnExportCsv');
-const btnHighlight = document.getElementById('btnHighlight');
-const btnRemoveHighlight = document.getElementById('btnRemoveHighlight');
 const btnSnapshot = document.getElementById('btnSnapshot');
 const btnCompare = document.getElementById('btnCompare');
 const historyList = document.getElementById('historyList');
 const searchInput = document.getElementById('searchInput');
 
-// --- Helpers
 function setStatus(text, detail = '') {
   statusChip.textContent = text;
   statusDetail.textContent = detail;
@@ -86,27 +80,37 @@ function buildTree(node, query = '') {
     const li = document.createElement('li');
     const header = document.createElement('div');
     header.className = 'node';
-    header.innerHTML = `${hasChildren ? '▸' : '•'} ${nodeLabel(n)} <span class="small">(${n.descendantsCount} desc)</span>`;
-    header.onclick = () => {
+    const triangle = document.createElement('span');
+    triangle.textContent = hasChildren ? '▸' : '•';
+    header.appendChild(triangle);
+
+    const label = document.createElement('span');
+    label.innerHTML = `${nodeLabel(n)} <span class="small">(${n.descendantsCount} desc)</span>`;
+    header.appendChild(label);
+
+    // selection full-row
+    header.addEventListener('click', () => {
       state.selectedUniqueIndex = n.uniqueIndex;
       document.querySelectorAll('.node.selected').forEach(x => x.classList.remove('selected'));
       header.classList.add('selected');
-    };
+      // toggle only if has children
+      if (hasChildren) {
+        const visible = ul.style.display !== 'none';
+        ul.style.display = visible ? 'none' : '';
+        triangle.textContent = visible ? '▸' : '▾';
+      }
+    });
+
     li.appendChild(header);
 
+    let ul;
     if (hasChildren) {
-      const ul = document.createElement('ul');
+      ul = document.createElement('ul');
       ul.style.display = 'none';
       (n.childNodes || []).forEach(child => {
         const childEl = render(child);
         if (childEl) ul.appendChild(childEl);
       });
-      header.addEventListener('click', (e) => {
-        // toggle only when clicking triangle area: acceptable simple toggle
-        ul.style.display = ul.style.display === 'none' ? '' : 'none';
-        header.firstChild.textContent = (ul.style.display === 'none' ? '▸' : '▾');
-        e.stopPropagation();
-      }, { once: true }); // set initial triangle change on first expand
       li.appendChild(ul);
     }
     const html = header.innerHTML;
@@ -127,7 +131,7 @@ function renderMetrics(payload) {
     tagCounts,
     inlineStyleCount,
     totalAttributes,
-    heavyNodesTop, // [{desc, descendantsCount, uniqueIndex}]
+    heavyNodesTop,
     warningLevel
   } = payload;
 
@@ -138,28 +142,28 @@ function renderMetrics(payload) {
     .join('');
 
   const heavyList = heavyNodesTop.map(n =>
-    `<div class="row"><span>${n.desc}</span><span>${n.descendantsCount}</span></div>`
+    `<div class="row"><span class="desc">${n.desc}</span><span class="small">${n.descendantsCount}</span></div>`
   ).join('');
 
-  const warnChip = warningLevel >= 2 ? '⚠️ سنگین' : (warningLevel === 1 ? '🟡 متوسط' : '🟢 خوب');
+  const warnChip = warningLevel >= 2 ? '⚠️ Heavy' : (warningLevel === 1 ? '🟡 Medium' : '🟢 Good');
 
   metricsEl.innerHTML = `
     <div class="kpi">
-      <div class="card"><div class="small">کل نودها</div><div style="font-size:20px">${totalNodes}</div></div>
-      <div class="card"><div class="small">بیشترین عمق</div><div style="font-size:20px">${maxDepth}</div></div>
-      <div class="card"><div class="small">Inline Styles</div><div style="font-size:20px">${inlineStyleCount}</div></div>
+      <div class="card"><div class="small">Total nodes</div><div style="font-size:20px">${totalNodes}</div></div>
+      <div class="card"><div class="small">Max depth</div><div style="font-size:20px">${maxDepth}</div></div>
+      <div class="card"><div class="small">Inline styles</div><div style="font-size:20px">${inlineStyleCount}</div></div>
       <div class="card"><div class="small">Attributes</div><div style="font-size:20px">${totalAttributes}</div></div>
     </div>
     <div class="card" style="margin-top:10px">
-      <div class="row"><strong>وضعیت DOM</strong><span>${warnChip}</span></div>
-      <div class="small">تعداد زیاد نودها و عمق زیاد می‌تواند باعث کاهش Performance شود.</div>
+      <div class="row"><strong>DOM status</strong><span>${warnChip}</span></div>
+      <div class="small">Lots of nodes or deep trees can hurt performance.</div>
     </div>
     <div class="card" style="margin-top:10px">
-      <div class="row"><strong>پراکندگی تگ‌ها (Top 12)</strong></div>
+      <div class="row"><strong>Tag distribution (Top 12)</strong></div>
       <div class="taglist" style="margin-top:8px">${tagList || '<span class="small">—</span>'}</div>
     </div>
     <div class="card" style="margin-top:10px">
-      <div class="row"><strong>سنگین‌ترین نودها (descendants)</strong><span class="small">Top 10</span></div>
+      <div class="row"><strong>Heaviest nodes (by descendants)</strong><span class="small">Top 10</span></div>
       <div style="margin-top:8px">${heavyList || '<span class="small">—</span>'}</div>
     </div>
   `;
@@ -205,7 +209,7 @@ port.onMessage.addListener((msg) => {
 // Initial ping to ensure wiring
 send(TYPES.PING);
 
-// --- UI events
+// UI events
 btnAnalyze.onclick = () => {
   setStatus('Loading', 'collecting DOM...');
   send(TYPES.GET_DOM_DETAILS);
@@ -227,22 +231,9 @@ btnExportCsv.onclick = () => {
   download('dom-analyzer.csv', buildCsv(state.flat));
 };
 
-btnHighlight.onclick = () => {
-  if (state.selectedUniqueIndex == null) return;
-  send(TYPES.HIGHLIGHT_ELEMENT, { uniqueElementIndex: state.selectedUniqueIndex });
-};
-
-btnRemoveHighlight.onclick = () => {
-  send(TYPES.REMOVE_HIGHLIGHT);
-};
-
 btnSnapshot.onclick = () => {
   if (!state.dom) return;
-  // keep last 10
-  const metrics = metricsEl.innerText ? {} : {};
   const snapshot = { ts: Date.now(), metrics: {} };
-  // extract basic metrics from current UI (we also have them in last GET result)
-  // Better: reconstruct from state.flat/dom (not stored). We add minimal persisted metrics:
   snapshot.metrics = {
     totalNodes: state.flat.length,
     maxDepth: Math.max(...state.flat.map(n => n.depth || 0))
@@ -260,7 +251,7 @@ btnCompare.onclick = () => {
     nodesDiff: (b.metrics.totalNodes || 0) - (a.metrics.totalNodes || 0),
     depthDiff: (b.metrics.maxDepth || 0) - (a.metrics.maxDepth || 0),
   };
-  alert(`مقایسه آخرین ۲ Snapshot:\n\nاختلاف نودها: ${diff.nodesDiff}\nاختلاف عمق: ${diff.depthDiff}`);
+  alert(`Compare last two snapshots:\n\nNodes diff: ${diff.nodesDiff}\nDepth diff: ${diff.depthDiff}`);
 };
 
 searchInput.addEventListener('input', () => {

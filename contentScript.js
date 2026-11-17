@@ -1,5 +1,5 @@
 // contentScript.js (MV3-safe)
-// Inject page-level script (injectable.js) to access DOM fully and create overlay
+// Inject page-level script (injectable.js) to access DOM fully
 
 (function inject() {
   const id = 'dom-size-analyzer-injector';
