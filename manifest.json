@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Dom Size Analyzer",
+  "description": "Google Chrome DevTools Extension for analyzing DOM size",
+  "version": "1.25",
+  "permissions": ["scripting", "tabs"],
+  "host_permissions": ["<all_urls>"],
+  "devtools_page": "devtools.html",
+  "web_accessible_resources": [
+    {
+      "resources": ["injectable.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["contentScript.js"]
+    }
+  ],
+  "background": {
+    "service_worker": "backgroundScript.js"
+  }
+}
