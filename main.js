@@ -13,6 +13,8 @@ const state = {
   flat: [],
   selectedUniqueIndex: null,
   snapshots: [],
+  inflight: false,
+  filterTag: null,
 };
 
 // UI refs
@@ -21,13 +23,14 @@ const metricsEl = document.getElementById('metrics');
 const statusChip = document.getElementById('statusChip');
 const statusDetail = document.getElementById('statusDetail');
 const btnAnalyze = document.getElementById('btnAnalyze');
-const btnRefresh = document.getElementById('btnRefresh');
 const btnExportJson = document.getElementById('btnExportJson');
 const btnExportCsv = document.getElementById('btnExportCsv');
 const btnSnapshot = document.getElementById('btnSnapshot');
 const btnCompare = document.getElementById('btnCompare');
+const btnClearHistory = document.getElementById('btnClearHistory');
 const historyList = document.getElementById('historyList');
 const searchInput = document.getElementById('searchInput');
+const btnCollapseAll = document.getElementById('btnCollapseAll');
 
 function setStatus(text, detail = '') {
   statusChip.textContent = text;
@@ -67,19 +70,46 @@ function flatten(root) {
   return out;
 }
 
-function buildTree(node, query = '') {
-  const matches = (html) => {
+// heaviness thresholds by descendantsCount
+function heavinessClass(desc) {
+  if (desc >= 1000) return 'hx-red';
+  if (desc >= 300) return 'hx-orange';
+  if (desc >= 80) return 'hx-yellow';
+  return 'hx-green';
+}
+
+function buildTree(node, opts = {}) {
+  const { query = '', filterTag = null, forceExpandMatches = true } = opts;
+
+  const matchesFreeText = (html) => {
     if (!query) return true;
     const q = query.toLowerCase();
     const text = html.replace(/<[^>]+>/g, '').toLowerCase();
     return text.includes(q);
   };
 
+  const matchesTag = (n) => {
+    if (!filterTag) return true;
+    const t = (n.tagName || n.nodeName || '').toLowerCase();
+    return t === filterTag.toLowerCase();
+  };
+
   function render(n) {
     const hasChildren = (n.childNodes && n.childNodes.length);
+    let childElements = [];
+    let childHasMatch = false;
+
+    // Pre-render children to know if any matches exist to keep parents visible
+    if (hasChildren) {
+      childElements = (n.childNodes || []).map(ch => render(ch)).filter(Boolean);
+      childHasMatch = childElements.length > 0;
+    }
+
     const li = document.createElement('li');
     const header = document.createElement('div');
-    header.className = 'node';
+    header.className = 'node ' + heavinessClass(n.descendantsCount || 0);
+    header.dataset.uniqueIndex = n.uniqueIndex;
+
     const triangle = document.createElement('span');
     triangle.textContent = hasChildren ? '▸' : '•';
     header.appendChild(triangle);
@@ -88,12 +118,10 @@ function buildTree(node, query = '') {
     label.innerHTML = `${nodeLabel(n)} <span class="small">(${n.descendantsCount} desc)</span>`;
     header.appendChild(label);
 
-    // selection full-row
     header.addEventListener('click', () => {
       state.selectedUniqueIndex = n.uniqueIndex;
       document.querySelectorAll('.node.selected').forEach(x => x.classList.remove('selected'));
       header.classList.add('selected');
-      // toggle only if has children
       if (hasChildren) {
         const visible = ul.style.display !== 'none';
         ul.style.display = visible ? 'none' : '';
@@ -106,15 +134,27 @@ function buildTree(node, query = '') {
     let ul;
     if (hasChildren) {
       ul = document.createElement('ul');
+      // default collapsed
       ul.style.display = 'none';
-      (n.childNodes || []).forEach(child => {
-        const childEl = render(child);
-        if (childEl) ul.appendChild(childEl);
-      });
+      childElements.forEach(childEl => ul.appendChild(childEl));
       li.appendChild(ul);
     }
+
     const html = header.innerHTML;
-    if (!matches(html)) return null;
+    const passFree = matchesFreeText(html);
+    const passTag = matchesTag(n) || childHasMatch;
+
+    // If a tag filter is set, keep parent chain if any descendant matches
+    if (!passFree || !passTag) return childHasMatch ? li : null;
+
+    // Expand automatically when filtering to show matches
+    if (forceExpandMatches && (filterTag || query)) {
+      if (hasChildren && (matchesTag(n) || childHasMatch)) {
+        ul && (ul.style.display = '');
+        triangle.textContent = hasChildren ? '▾' : triangle.textContent;
+      }
+    }
+
     return li;
   }
 
@@ -138,12 +178,19 @@ function renderMetrics(payload) {
   const tagList = Object.entries(tagCounts)
     .sort((a,b) => b[1]-a[1])
     .slice(0, 12)
-    .map(([k,v]) => `<span class="tagitem">${k}: ${v}</span>`)
+    .map(([k,v]) => `<span class="tagitem" data-tag="${k}">${k}: ${v}</span>`)
     .join('');
 
   const heavyList = heavyNodesTop.map(n =>
     `<div class="row"><span class="desc">${n.desc}</span><span class="small">${n.descendantsCount}</span></div>`
   ).join('');
+
+  // Standard thresholds (#3)
+  const standards = [
+    "Total nodes ≤ 1500 (Good), 1500–3000 (Medium), >3000 (Heavy)",
+    "Max depth ≤ 25 (Good), 26–32 (Medium), >32 (Heavy)",
+    "Inline styles ≤ 100 (Good), 101–200 (Medium), >200 (Heavy)",
+  ];
 
   const warnChip = warningLevel >= 2 ? '⚠️ Heavy' : (warningLevel === 1 ? '🟡 Medium' : '🟢 Good');
 
@@ -156,7 +203,10 @@ function renderMetrics(payload) {
     </div>
     <div class="card" style="margin-top:10px">
       <div class="row"><strong>DOM status</strong><span>${warnChip}</span></div>
-      <div class="small">Lots of nodes or deep trees can hurt performance.</div>
+      <div class="small">Standards:</div>
+      <ul class="small" style="margin-top:4px; padding-left:16px">
+        ${standards.map(s => `<li>${s}</li>`).join('')}
+      </ul>
     </div>
     <div class="card" style="margin-top:10px">
       <div class="row"><strong>Tag distribution (Top 12)</strong></div>
@@ -167,6 +217,17 @@ function renderMetrics(payload) {
       <div style="margin-top:8px">${heavyList || '<span class="small">—</span>'}</div>
     </div>
   `;
+
+  // (#10) Delegate click: when clicking a tag pill, expand nodes with that tag
+  metricsEl.querySelectorAll('.tagitem[data-tag]').forEach(el => {
+    el.addEventListener('click', () => {
+      state.filterTag = el.getAttribute('data-tag');
+      searchInput.value = ''; // reset text search
+      if (!state.dom) return;
+      treeEl.innerHTML = '';
+      treeEl.appendChild(buildTree(state.dom, { query: '', filterTag: state.filterTag }));
+    });
+  });
 }
 
 function buildCsv(flat) {
@@ -199,9 +260,14 @@ port.onMessage.addListener((msg) => {
     state.dom = dom;
     state.flat = flatten(dom);
 
-    setStatus('Success', `nodes: ${metrics.totalNodes}, depth: ${metrics.maxDepth}`);
+    // (#5) Clean status: no "Success / nodes / depth" verbosity
+    setStatus('Done', '');
+    state.inflight = false;
+
+    // render tree
     treeEl.innerHTML = '';
-    treeEl.appendChild(buildTree(dom, searchInput.value.trim()));
+    const q = searchInput.value.trim();
+    treeEl.appendChild(buildTree(dom, { query: q, filterTag: state.filterTag }));
     renderMetrics(metrics);
   }
 });
@@ -211,14 +277,20 @@ send(TYPES.PING);
 
 // UI events
 btnAnalyze.onclick = () => {
-  setStatus('Loading', 'collecting DOM...');
+  if (state.inflight) return; // prevent double-press lock
+  state.inflight = true;
+  state.filterTag = null; // reset filter
+  setStatus('Loading', '');
   send(TYPES.GET_DOM_DETAILS);
-};
 
-btnRefresh.onclick = () => {
-  if (!state.dom) return btnAnalyze.click();
-  setStatus('Loading', 'refreshing...');
-  send(TYPES.GET_DOM_DETAILS);
+  // safety timeout to avoid "stuck loading" (#2)
+  setTimeout(() => {
+    if (state.inflight) {
+      state.inflight = false;
+      setStatus('Retrying...', '');
+      send(TYPES.GET_DOM_DETAILS);
+    }
+  }, 4000);
 };
 
 btnExportJson.onclick = () => {
@@ -239,7 +311,7 @@ btnSnapshot.onclick = () => {
     maxDepth: Math.max(...state.flat.map(n => n.depth || 0))
   };
   state.snapshots.push(snapshot);
-  if (state.snapshots.length > 10) state.snapshots.shift();
+  if (state.snapshots.length > 50) state.snapshots.shift();
   renderHistory();
 };
 
@@ -254,8 +326,29 @@ btnCompare.onclick = () => {
   alert(`Compare last two snapshots:\n\nNodes diff: ${diff.nodesDiff}\nDepth diff: ${diff.depthDiff}`);
 };
 
+btnClearHistory.onclick = () => {
+  state.snapshots = [];
+  renderHistory();
+};
+
 searchInput.addEventListener('input', () => {
+  state.filterTag = null; // text search cancels tag filter
   if (!state.dom) return;
   treeEl.innerHTML = '';
-  treeEl.appendChild(buildTree(state.dom, searchInput.value.trim()));
+  treeEl.appendChild(buildTree(state.dom, { query: searchInput.value.trim() }));
+});
+
+let collapsedAll = true;
+btnCollapseAll.addEventListener('click', () => {
+  if (!treeEl) return;
+  const uls = treeEl.querySelectorAll('ul');
+  uls.forEach(ul => {
+    if (ul === treeEl.firstElementChild) return; // keep root controlled via triangle
+    ul.style.display = collapsedAll ? '' : 'none';
+  });
+  treeEl.querySelectorAll('.node > span:first-child').forEach(tri => {
+    if (tri.textContent === '•') return;
+    tri.textContent = collapsedAll ? '▾' : '▸';
+  });
+  collapsedAll = !collapsedAll;
 });

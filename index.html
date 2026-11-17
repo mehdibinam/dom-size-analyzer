@@ -5,7 +5,7 @@
   <title>Dom Size Analyzer</title>
   <style>
     :root {
-      --bg: #121826;           /* lighter than before for readability */
+      --bg: #121826;
       --panel: #1a2233;
       --text: #e5e7eb;
       --muted: #9ca3af;
@@ -16,6 +16,10 @@
       --ok: #10b981;
       --line: #2b354a;
       --card: #172035;
+      --green: #064e3b;
+      --yellow: #78350f;
+      --orange: #7c2d12;
+      --red: #7f1d1d;
     }
     html,body { margin:0; padding:0; height:100%; background:var(--bg); color:var(--text);
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto; font-size:15px; }
@@ -33,19 +37,18 @@
     .btn:hover { border-color:#4b5f82; }
     .btn.primary { background: #2563eb; border-color:#1d4ed8; }
     .btn.ghost { background: transparent; border-color: #344461; }
-    .btn.warn { background:#b45309; border-color:#92400e; }
-    .btn.ok { background:#047857; border-color:#065f46; }
 
     .panel {
       flex:1; display:flex; flex-direction:column; overflow:hidden;
     }
     .panel-header {
-      display:flex; align-items:center; justify-content:space-between;
-      padding: 10px 12px; border-bottom: 1px solid var(--line); gap: 10px;
+      display:flex; align-items:center; gap: 10px;
+      padding: 10px 12px; border-bottom: 1px solid var(--line);
     }
-    .chip { background:var(--chip); padding:6px 10px; border-radius:999px; font-size:12px; color:var(--muted); }
+    .spacer { flex: 1; }
+    .chip { background:var(--chip); padding:6px 10px; border-radius:999px; font-size:12px; color:var(--muted); white-space:nowrap; }
     .content { flex:1; display:flex; min-height:0; }
-    .tree { flex:1; overflow:auto; padding:10px 14px; }
+    .tree { flex:1; overflow-y:auto; overflow-x:hidden; padding:10px 14px; }
     .metrics { padding:10px 12px; overflow:auto; background: var(--panel); border-top:1px solid var(--line); }
 
     ul { list-style:none; padding-left:14px; margin:0; }
@@ -55,7 +58,7 @@
       font-size: 15px; line-height: 1.3;
     }
     .node:hover { background:#1b263b; }
-    .node.selected { background:#1f2b44; outline:1px solid #344461; }
+    .node.selected { outline:1px solid #344461; }
     .node .tag { color:#93c5fd; }
     .node .id { color:#34d399; }
     .node .cls { color:#fca5a5; }
@@ -64,32 +67,34 @@
     .kpi { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
     .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px; }
     .row { display:flex; justify-content:space-between; align-items:center; gap:10px; margin:6px 0; }
-    .row .desc { min-width:0; flex:1 1 auto; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; } /* Prevent overflow */
+    .row .desc { min-width:0; flex:1 1 auto; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
     .taglist { display:flex; flex-wrap:wrap; gap:6px; }
-    .tagitem { background:var(--card); border:1px dashed #2b354a; padding:4px 8px; border-radius:8px; font-size:12px; }
-    .search { width:320px; max-width:420px; padding:8px 12px; border-radius:10px; border:1px solid #344461; background:#0f1a2e; color:var(--text); }
+    .tagitem { background:var(--card); border:1px dashed #2b354a; padding:4px 8px; border-radius:8px; font-size:12px; cursor:pointer; user-select:none; }
+    .search { flex:1; min-width:260px; padding:8px 12px; border-radius:10px; border:1px solid #344461; background:#0f1a2e; color:var(--text); }
 
     /* Layout: sidebar contains controls + metrics */
     .sidebar-section { padding:12px; display:flex; flex-direction:column; gap:10px; }
     .sidebar-title { padding:10px 12px; border-bottom:1px solid var(--line); font-weight:600; }
 
+    /* Heaviness background for nodes */
+    .hx-green { background: rgba(16, 185, 129, 0.10); }  /* light green */
+    .hx-yellow { background: rgba(245, 158, 11, 0.10); } /* light yellow */
+    .hx-orange { background: rgba(234, 88, 12, 0.10); }  /* light orange */
+    .hx-red { background: rgba(239, 68, 68, 0.12); }     /* light red */
   </style>
 </head>
 <body>
   <div id="app">
     <div class="panel">
       <div class="panel-header">
-        <div style="display:flex; align-items:center; gap:8px; min-width:0">
-          <span class="chip" id="statusChip">Idle</span>
-          <span class="small" id="statusDetail"></span>
-        </div>
         <input id="searchInput" class="search" placeholder="Search tag, #id or .class…" />
-        <div style="display:flex; gap:8px">
-          <button class="btn primary" id="btnAnalyze">Analyze DOM</button>
-          <button class="btn" id="btnRefresh">Refresh</button>
-          <button class="btn ghost" id="btnExportJson">Export JSON</button>
-          <button class="btn ghost" id="btnExportCsv">Export CSV</button>
-        </div>
+        <button class="btn primary" id="btnAnalyze">Analyze DOM</button>
+        <button class="btn ghost" id="btnExportJson">Export JSON</button>
+        <button class="btn ghost" id="btnExportCsv">Export CSV</button>
+        <button class="btn ghost" id="btnCollapseAll" title="Collapse/Expand all">⤢</button>
+        <span class="spacer"></span>
+        <span class="chip" id="statusChip">Idle</span>
+        <span class="small" id="statusDetail"></span>
       </div>
       <div class="content">
         <div class="tree" id="tree"></div>
@@ -100,22 +105,22 @@
         Controls
       </div>
       <div class="sidebar-section">
+        <div id="metrics" class="metrics card"></div>
+
         <div class="card">
-          <div class="small">History</div>
-          <div style="display:flex; gap:8px; margin-top:8px">
-            <button class="btn" id="btnSnapshot">Snapshot</button>
-            <button class="btn" id="btnCompare">Compare last 2</button>
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px">
+            <div class="small">History</div>
+            <div style="display:flex; gap:8px">
+              <button class="btn" id="btnSnapshot">Snapshot</button>
+              <button class="btn" id="btnCompare">Compare last 2</button>
+              <button class="btn ghost" id="btnClearHistory" title="Clear history">🧹</button>
+            </div>
           </div>
           <div id="historyList" class="taglist" style="margin-top:8px"></div>
-        </div>
-
-        <div id="metrics" class="metrics card">
-          <!-- Metrics will render here (moved under history) -->
         </div>
       </div>
     </div>
   </div>
-
   <script src="main.js" defer></script>
 </body>
 </html>
