@@ -1,7 +1,112 @@
 <!DOCTYPE html>
-<html>
-  <body>
-    <div id="app"></div>
-    <script src="main.js" charset="utf-8"></script>
-  </body>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <title>Dom Size Analyzer</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #60a5fa;
+      --chip: #1f2937;
+      --warn: #f59e0b;
+      --err: #ef4444;
+      --ok: #10b981;
+      --line: #1f2937;
+    }
+    html,body { margin:0; padding:0; height:100%; background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto; }
+    #app { display:flex; height:100%; }
+
+    .sidebar {
+      width: 320px; border-left: 1px solid var(--line); background: var(--panel); display:flex; flex-direction:column;
+    }
+    .toolbar {
+      padding: 10px; display:flex; gap:8px; flex-wrap: wrap; border-bottom:1px solid var(--line);
+    }
+    .btn {
+      background:#1f2937; color:var(--text); border:1px solid #374151; padding:6px 10px; border-radius:8px; cursor:pointer;
+    }
+    .btn:hover { border-color:#4b5563; }
+    .btn.primary { background: #2563eb; border-color:#1d4ed8; }
+    .btn.ghost { background: transparent; border-color: #374151; }
+    .btn.warn { background:#b45309; border-color:#92400e; }
+    .btn.ok { background:#047857; border-color:#065f46; }
+
+    .panel {
+      flex:1; display:flex; flex-direction:column; overflow:hidden;
+    }
+    .panel-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding: 10px 12px; border-bottom: 1px solid var(--line);
+    }
+    .chip { background:var(--chip); padding:4px 8px; border-radius:999px; font-size:12px; color:var(--muted); }
+    .content { flex:1; display:flex; min-height:0; }
+    .tree { flex:1; overflow:auto; padding:10px 14px; }
+    .metrics { width: 360px; border-left:1px solid var(--line); padding:10px 12px; overflow:auto; background: #0b1220; }
+
+    ul { list-style:none; padding-left:14px; margin:0; }
+    li { margin: 2px 0; }
+    .node {
+      cursor:pointer; display:inline-flex; align-items:center; gap:6px; padding:2px 6px; border-radius:6px;
+    }
+    .node:hover { background:#0b1220; }
+    .node .tag { color:#93c5fd; }
+    .node .id { color:#34d399; }
+    .node .cls { color:#fca5a5; }
+
+    .small { color: var(--muted); font-size: 12px; }
+    .kpi { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .card { background:#0b1220; border:1px solid var(--line); border-radius:10px; padding:10px; }
+    .row { display:flex; justify-content:space-between; margin:6px 0; }
+    .taglist { display:flex; flex-wrap:wrap; gap:6px; }
+    .tagitem { background:#0b1220; border:1px dashed #1f2937; padding:3px 6px; border-radius:6px; font-size:12px; }
+    .search { width:100%; padding:7px 10px; border-radius:8px; border:1px solid #334155; background:#0b1220; color:var(--text); }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="panel">
+      <div class="panel-header">
+        <div style="display:flex; align-items:center; gap:8px">
+          <span class="chip" id="statusChip">Idle</span>
+          <span class="small" id="statusDetail"></span>
+        </div>
+        <div>
+          <button class="btn primary" id="btnAnalyze">آنالیز DOM</button>
+          <button class="btn" id="btnRefresh">تازه‌سازی</button>
+          <button class="btn ghost" id="btnExportJson">Export JSON</button>
+          <button class="btn ghost" id="btnExportCsv">Export CSV</button>
+        </div>
+      </div>
+      <div class="toolbar">
+        <input id="searchInput" class="search" placeholder="جست‌وجوی تگ، #id یا .class..." />
+      </div>
+      <div class="content">
+        <div class="tree" id="tree"></div>
+        <div class="metrics" id="metrics"></div>
+      </div>
+    </div>
+    <div class="sidebar">
+      <div class="panel-header">
+        <strong>کنترل‌ ها</strong>
+      </div>
+      <div style="padding:12px; display:flex; flex-direction:column; gap:8px">
+        <button class="btn ok" id="btnHighlight">هایلایت نود انتخاب‌شده</button>
+        <button class="btn warn" id="btnRemoveHighlight">حذف هایلایت</button>
+        <div class="card">
+          <div class="small">History</div>
+          <div style="display:flex; gap:8px; margin-top:8px">
+            <button class="btn" id="btnSnapshot">Snapshot</button>
+            <button class="btn" id="btnCompare">Compare آخرین ۲ Snapshot</button>
+          </div>
+          <div id="historyList" class="taglist" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="main.js" defer></script>
+</body>
 </html>

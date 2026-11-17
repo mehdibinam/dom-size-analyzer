@@ -1,1 +1,25 @@
-!function(e){var t={};function n(r){if(t[r])return t[r].exports;var o=t[r]={i:r,l:!1,exports:{}};return e[r].call(o.exports,o,o.exports,n),o.l=!0,o.exports}n.m=e,n.c=t,n.d=function(e,t,r){n.o(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:r})},n.r=function(e){"undefined"!=typeof Symbol&&Symbol.toStringTag&&Object.defineProperty(e,Symbol.toStringTag,{value:"Module"}),Object.defineProperty(e,"__esModule",{value:!0})},n.t=function(e,t){if(1&t&&(e=n(e)),8&t)return e;if(4&t&&"object"==typeof e&&e&&e.__esModule)return e;var r=Object.create(null);if(n.r(r),Object.defineProperty(r,"default",{enumerable:!0,value:e}),2&t&&"string"!=typeof e)for(var o in e)n.d(r,o,function(t){return e[t]}.bind(null,o));return r},n.n=function(e){var t=e&&e.__esModule?function(){return e.default}:function(){return e};return n.d(t,"a",t),t},n.o=function(e,t){return Object.prototype.hasOwnProperty.call(e,t)},n.p=".",n(n.s=28)}({1:function(e,t,n){"use strict";n.d(t,"a",function(){return r});const r="DOM_SIZE_ANALYZER"},2:function(e,t,n){"use strict";n.r(t),n.d(t,"getDOMdetails",function(){return o}),n.d(t,"sendEvent",function(){return i}),n.d(t,"getGreenRedGradientInHSL",function(){return u}),n.d(t,"generateNodeDescription",function(){return c}),n.d(t,"pluralizeWord",function(){return d});var r=n(1);function o(e){const t=function(e={},t){const{attributes:n={}}=e;return{nodeType:e.nodeType,tagName:e.tagName,nodeName:e.nodeName,nodeValue:e.nodeValue,id:n.id?n.id.value:void 0,class:n.class?n.class.value:void 0,descendantsCount:"function"==typeof e.getElementsByTagName?e.getElementsByTagName("*").length:0,attributes:"function"==typeof n.entries?n.entries():[],...t}}(e=e||document.body,{uniqueIndex:window[r.a].insertIntoElementsArray(e)}),{childNodes:n}=e;if(n){const{length:e}=n;t.childNodes=new Array(e);const r=t.childNodes;for(let t=0;t<e;t+=1)r[t]=o(n[t])}return t}function i({type:e=null,src:t,data:n,tabID:r}){const o=new CustomEvent("commandEvent",{detail:{type:e,src:t,data:n,tabID:r}});window.dispatchEvent(o)}function u(e){return e>1500&&(e=1500),["hsl(",(120*(1-e/1500)).toString(10),",70%,50%)"].join("")}function c(e={}){const{class:t,id:n}=e;return`${e.tagName}${n?`#${n}`:""}${t?`.${t}`:""}`}function d(e,t,n="s"){return`${e}${1!==t?n:""}`}},28:function(e,t,n){"use strict";n.r(t);var r=n(2);const o=document.createElement("script");o.src=chrome.runtime.getURL("injectable.js"),(document.head||document.documentElement).appendChild(o),o.onload=()=>{o.parentNode.removeChild(o)},window.addEventListener("commandEvent",e=>{const{detail:t}=e,{src:n}=t||{};"content-script"!==n&&chrome.runtime.sendMessage(t)}),chrome.runtime.onMessage.addListener(e=>{Object(r.sendEvent)({...e,src:"content-script"})})}});
+// contentScript.js (MV3-safe)
+// Inject page-level script (injectable.js) to access DOM fully and create overlay
+
+(function inject() {
+  const id = 'dom-size-analyzer-injector';
+  if (document.getElementById(id)) return;
+  const s = document.createElement('script');
+  s.id = id;
+  s.src = chrome.runtime.getURL('injectable.js');
+  (document.head || document.documentElement).appendChild(s);
+  s.onload = () => s.remove();
+})();
+
+// Relay custom events <-> extension
+window.addEventListener('commandEvent', (e) => {
+  const detail = (e || {}).detail || {};
+  if (detail?.src === 'content-script') return;
+  chrome.runtime.sendMessage(detail);
+});
+
+chrome.runtime.onMessage.addListener((msg) => {
+  // forward to page
+  const ev = new CustomEvent('commandEvent', { detail: { ...msg, src: 'content-script' } });
+  window.dispatchEvent(ev);
+});

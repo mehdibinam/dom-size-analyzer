@@ -1,1 +1,170 @@
-!function(e){var t={};function n(o){if(t[o])return t[o].exports;var r=t[o]={i:o,l:!1,exports:{}};return e[o].call(r.exports,r,r.exports,n),r.l=!0,r.exports}n.m=e,n.c=t,n.d=function(e,t,o){n.o(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:o})},n.r=function(e){"undefined"!=typeof Symbol&&Symbol.toStringTag&&Object.defineProperty(e,Symbol.toStringTag,{value:"Module"}),Object.defineProperty(e,"__esModule",{value:!0})},n.t=function(e,t){if(1&t&&(e=n(e)),8&t)return e;if(4&t&&"object"==typeof e&&e&&e.__esModule)return e;var o=Object.create(null);if(n.r(o),Object.defineProperty(o,"default",{enumerable:!0,value:e}),2&t&&"string"!=typeof e)for(var r in e)n.d(o,r,function(t){return e[t]}.bind(null,r));return o},n.n=function(e){var t=e&&e.__esModule?function(){return e.default}:function(){return e};return n.d(t,"a",t),t},n.o=function(e,t){return Object.prototype.hasOwnProperty.call(e,t)},n.p=".",n(n.s=27)}({1:function(e,t,n){"use strict";n.d(t,"a",function(){return o});const o="DOM_SIZE_ANALYZER"},2:function(e,t,n){"use strict";n.r(t),n.d(t,"getDOMdetails",function(){return r}),n.d(t,"sendEvent",function(){return i}),n.d(t,"getGreenRedGradientInHSL",function(){return u}),n.d(t,"generateNodeDescription",function(){return c}),n.d(t,"pluralizeWord",function(){return d});var o=n(1);function r(e){const t=function(e={},t){const{attributes:n={}}=e;return{nodeType:e.nodeType,tagName:e.tagName,nodeName:e.nodeName,nodeValue:e.nodeValue,id:n.id?n.id.value:void 0,class:n.class?n.class.value:void 0,descendantsCount:"function"==typeof e.getElementsByTagName?e.getElementsByTagName("*").length:0,attributes:"function"==typeof n.entries?n.entries():[],...t}}(e=e||document.body,{uniqueIndex:window[o.a].insertIntoElementsArray(e)}),{childNodes:n}=e;if(n){const{length:e}=n;t.childNodes=new Array(e);const o=t.childNodes;for(let t=0;t<e;t+=1)o[t]=r(n[t])}return t}function i({type:e=null,src:t,data:n,tabID:o}){const r=new CustomEvent("commandEvent",{detail:{type:e,src:t,data:n,tabID:o}});window.dispatchEvent(r)}function u(e){return e>1500&&(e=1500),["hsl(",(120*(1-e/1500)).toString(10),",70%,50%)"].join("")}function c(e={}){const{class:t,id:n}=e;return`${e.tagName}${n?`#${n}`:""}${t?`.${t}`:""}`}function d(e,t,n="s"){return`${e}${1!==t?n:""}`}},27:function(e,t,n){"use strict";n.r(t);var o=n(5),r=n(1),i=n(2);const u={[o.GET_DOM_DETAILS]:function(){return window[r.a]={...window[r.a],elementsArray:[],insertIntoElementsArray:e=>window[r.a].elementsArray.push(e)-1},Object(i.getDOMdetails)()},[o.HIGHLIGHT_ELEMENT]:function({uniqueElementIndex:e}){const t=window[r.a].elementsArray[e];"function"==typeof t.scrollIntoView&&t.scrollIntoView(),function(e){const t=document.querySelector("#domCountAnalyzerOverlay"),n=e.getBoundingClientRect();t.style.display="block",t.style.top=`${n.top+window.scrollY}px`,t.style.left=`${n.left+window.scrollX}px`,t.style.width=`${n.width}px`,t.style.height=`${n.height}px`}(t)},[o.REMOVE_HIGHLIGHT]:function(){document.querySelector("#domCountAnalyzerOverlay").style.display="none"},ping:()=>Object(i.sendEvent)({src:"injected-script",type:"pong"})};!function(){const e=document.createElement("div");document.body.appendChild(e),e.setAttribute("id","domCountAnalyzerOverlay"),e.style.zIndex="9999999",e.style.background="rgba(112, 163, 255, 0.46)",e.style.display="none",e.style.position="absolute"}(),window.addEventListener("commandEvent",e=>{!function(e){const{detail:t}=e,{src:n,type:o,data:r,tabID:c}=t||{};if("injected-script"!==n&&o in u){const e=u[o](r);Object(i.sendEvent)({src:"injected-script",tabID:c,type:o,data:e})}}(e)})},5:function(e,t,n){"use strict";n.r(t),n.d(t,"GET_DOM_DETAILS",function(){return o}),n.d(t,"HIGHLIGHT_ELEMENT",function(){return r}),n.d(t,"REMOVE_HIGHLIGHT",function(){return i});const o="GET_DOM_DETAILS",r="HIGHLIGHT_ELEMENT",i="REMOVE_HIGHLIGHT"}});
+// injectable.js – runs in page context
+
+(function () {
+  const BUS_KEY = 'DOM_SIZE_ANALYZER_V2';
+
+  const TYPES = {
+    GET_DOM_DETAILS: 'GET_DOM_DETAILS',
+    HIGHLIGHT_ELEMENT: 'HIGHLIGHT_ELEMENT',
+    REMOVE_HIGHLIGHT: 'REMOVE_HIGHLIGHT',
+    PING: 'ping',
+  };
+
+  // State to map indices -> elements
+  window[BUS_KEY] = {
+    elementsArray: [],
+    insertIntoElementsArray(el) {
+      return this.elementsArray.push(el) - 1;
+    }
+  };
+
+  // Overlay for highlight
+  function ensureOverlay() {
+    let ov = document.getElementById('domCountAnalyzerOverlay');
+    if (!ov) {
+      ov = document.createElement('div');
+      ov.id = 'domCountAnalyzerOverlay';
+      ov.style.zIndex = '2147483647';
+      ov.style.background = 'rgba(96, 165, 250, 0.35)';
+      ov.style.outline = '2px solid rgba(59,130,246,0.8)';
+      ov.style.display = 'none';
+      ov.style.position = 'absolute';
+      ov.style.pointerEvents = 'none';
+      document.body.appendChild(ov);
+    }
+    return ov;
+  }
+  ensureOverlay();
+
+  function scrollAndOverlay(el) {
+    if (!el || typeof el.getBoundingClientRect !== 'function') return;
+    try { el.scrollIntoView({ block: 'center', inline: 'center' }); } catch (_) {}
+    const r = el.getBoundingClientRect();
+    const ov = ensureOverlay();
+    ov.style.display = 'block';
+    ov.style.top = `${r.top + window.scrollY}px`;
+    ov.style.left = `${r.left + window.scrollX}px`;
+    ov.style.width = `${Math.max(0, r.width)}px`;
+    ov.style.height = `${Math.max(0, r.height)}px`;
+  }
+
+  function hideOverlay() {
+    const ov = ensureOverlay();
+    ov.style.display = 'none';
+  }
+
+  function generateNodeDescription(n = {}) {
+    const { id, class: cls } = n;
+    const tag = n.tagName || n.nodeName || '';
+    const idPart = id ? `#${id}` : '';
+    const clsPart = cls ? `.${String(cls).split(' ').join('.')}` : '';
+    return `${tag}${idPart}${clsPart}`;
+  }
+
+  function collect(root = document.body) {
+    const bus = window[BUS_KEY];
+    bus.elementsArray = [];
+
+    function toMeta(el, depth) {
+      const attrs = (el.attributes && typeof el.attributes.entries === 'function')
+        ? Array.from(el.attributes.entries())
+        : el.attributes
+          ? Array.from(el.attributes).map(a => [a.name, a.value])
+          : [];
+
+      const meta = {
+        nodeType: el.nodeType,
+        tagName: el.tagName,
+        nodeName: el.nodeName,
+        nodeValue: el.nodeValue,
+        id: el.attributes?.id ? el.attributes.id.value : undefined,
+        class: el.attributes?.class ? el.attributes.class.value : undefined,
+        descendantsCount: typeof el.getElementsByTagName === 'function' ? el.getElementsByTagName('*').length : 0,
+        attributesArr: attrs,
+        uniqueIndex: bus.insertIntoElementsArray(el),
+        depth
+      };
+
+      const children = el.childNodes ? Array.from(el.childNodes) : [];
+      meta.childNodes = children.map(ch => toMeta(ch, depth + 1));
+      return meta;
+    }
+
+    const domTree = toMeta(root, 0);
+
+    // Metrics
+    const flat = [];
+    (function walk(n) {
+      flat.push(n);
+      (n.childNodes || []).forEach(walk);
+    })(domTree);
+
+    const totalNodes = flat.length;
+    const maxDepth = Math.max(...flat.map(n => n.depth || 0));
+    const inlineStyleCount = flat.reduce((acc, n) => acc + (n.attributesArr?.some(([k]) => k === 'style') ? 1 : 0), 0);
+    const totalAttributes = flat.reduce((acc, n) => acc + (n.attributesArr?.length || 0), 0);
+
+    const tagCounts = {};
+    flat.forEach(n => {
+      const t = (n.tagName || n.nodeName || '').toLowerCase();
+      if (!t) return;
+      tagCounts[t] = (tagCounts[t] || 0) + 1;
+    });
+
+    const heavyNodesTop = flat
+      .filter(n => (n.descendantsCount || 0) > 0)
+      .sort((a, b) => (b.descendantsCount || 0) - (a.descendantsCount || 0))
+      .slice(0, 10)
+      .map(n => ({ desc: generateNodeDescription(n), descendantsCount: n.descendantsCount, uniqueIndex: n.uniqueIndex }));
+
+    // Warning level heuristics
+    // 0 good, 1 medium, 2 heavy
+    let warningLevel = 0;
+    if (totalNodes > 1500 || maxDepth > 25 || inlineStyleCount > 200) warningLevel = 2;
+    else if (totalNodes > 800 || maxDepth > 18 || inlineStyleCount > 100) warningLevel = 1;
+
+    return {
+      dom: domTree,
+      metrics: {
+        totalNodes,
+        maxDepth,
+        tagCounts,
+        inlineStyleCount,
+        totalAttributes,
+        heavyNodesTop,
+        warningLevel
+      }
+    };
+  }
+
+  function post(type, data, tabID) {
+    const ev = new CustomEvent('commandEvent', {
+      detail: { type, data, tabID, src: 'injected-script' }
+    });
+    window.dispatchEvent(ev);
+  }
+
+  const handlers = {
+    [TYPES.GET_DOM_DETAILS]: () => {
+      const result = collect(document.body || document.documentElement);
+      return result;
+    },
+    [TYPES.HIGHLIGHT_ELEMENT]: ({ uniqueElementIndex }) => {
+      const el = window[BUS_KEY].elementsArray[uniqueElementIndex];
+      scrollAndOverlay(el);
+    },
+    [TYPES.REMOVE_HIGHLIGHT]: () => {
+      hideOverlay();
+    },
+    [TYPES.PING]: () => true
+  };
+
+  window.addEventListener('commandEvent', (evt) => {
+    const { detail } = evt || {};
+    const { src, type, data, tabID } = detail || {};
+    if (src === 'injected-script') return;
+    if (!type || !(type in handlers)) return;
+    const out = handlers[type](data || {});
+    post(type, out, tabID);
+  });
+})();
