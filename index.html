@@ -5,60 +5,118 @@
   <title>Dom Size Analyzer</title>
   <style>
     :root {
-      --bg: #121826;
-      --panel: #1a2233;
-      --text: #e5e7eb;
-      --muted: #9ca3af;
+      --bg: #1e293b;
+      --panel: #334155;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
       --accent: #60a5fa;
-      --chip: #263145;
+      --chip: #475569;
       --warn: #f59e0b;
       --err: #ef4444;
       --ok: #10b981;
-      --line: #2b354a;
-      --card: #172035;
-      --green: #064e3b;
+      --line: #475569;
+      --card: #2f3e52;
+      --green: #065f46;
       --yellow: #78350f;
       --orange: #7c2d12;
       --red: #7f1d1d;
     }
+
     html,body { margin:0; padding:0; height:100%; background:var(--bg); color:var(--text);
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto; font-size:15px; }
     #app { display:flex; height:100%; }
 
+    /* کنترل‌ها به چپ منتقل شده و 200px عرض بیشتر */
     .sidebar {
-      width: 340px; border-right: 1px solid var(--line); background: var(--panel); display:flex; flex-direction:column;
+      width: 540px;
+      border-right: 1px solid var(--line);
+      background: var(--panel);
+      display:flex;
+      flex-direction:column;
     }
+
     .toolbar {
-      padding: 10px; display:flex; gap:8px; align-items:center; border-bottom:1px solid var(--line);
+      padding: 10px;
+      display:flex;
+      gap:8px;
+      align-items:center;
+      border-bottom:1px solid var(--line);
     }
+
     .btn {
-      background:#24314a; color:var(--text); border:1px solid #344461; padding:8px 12px; border-radius:10px; cursor:pointer;
+      background:#475569;
+      color:var(--text);
+      border:1px solid #64748b;
+      padding:8px 12px;
+      border-radius:10px;
+      cursor:pointer;
+      font-size:13px;
     }
-    .btn:hover { border-color:#4b5f82; }
+    .btn:hover { border-color:#94a3b8; }
     .btn.primary { background: #2563eb; border-color:#1d4ed8; }
-    .btn.ghost { background: transparent; border-color: #344461; }
+    .btn.ghost { background: transparent; border-color: #64748b; }
 
     .panel {
-      flex:1; display:flex; flex-direction:column; overflow:hidden;
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      overflow:hidden;
     }
+
     .panel-header {
-      display:flex; align-items:center; gap: 10px;
-      padding: 10px 12px; border-bottom: 1px solid var(--line);
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
     }
+
     .spacer { flex: 1; }
-    .chip { background:var(--chip); padding:6px 10px; border-radius:999px; font-size:12px; color:var(--muted); white-space:nowrap; }
-    .content { flex:1; display:flex; min-height:0; }
-    .tree { flex:1; overflow-y:auto; overflow-x:hidden; padding:10px 14px; }
-    .metrics { padding:10px 12px; overflow:auto; background: var(--panel); border-top:1px solid var(--line); }
+
+    .chip {
+      background:var(--chip);
+      padding:6px 10px;
+      border-radius:999px;
+      font-size:12px;
+      color:var(--muted);
+      white-space:nowrap;
+    }
+
+    .content {
+      flex:1;
+      display:flex;
+      min-height:0;
+    }
+
+    .tree {
+      flex:1;
+      overflow-y:auto;
+      overflow-x:hidden;
+      padding:10px 14px;
+    }
+
+    .metrics {
+      padding:10px 12px;
+      overflow:auto;
+      background: var(--panel);
+      border-top:1px solid var(--line);
+    }
 
     ul { list-style:none; padding-left:14px; margin:0; }
     li { margin: 2px 0; }
     .node {
-      cursor:pointer; display:flex; align-items:center; gap:8px; padding:6px 10px; border-radius:8px; width:100%;
-      font-size: 15px; line-height: 1.3;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:6px 10px;
+      border-radius:8px;
+      width:100%;
+      font-size: 15px;
+      line-height: 1.3;
     }
-    .node:hover { background:#1b263b; }
-    .node.selected { outline:1px solid #344461; }
+    .node:hover { background:#475569; }
+    .node.selected { outline:1px solid #64748b; }
     .node .tag { color:#93c5fd; }
     .node .id { color:#34d399; }
     .node .cls { color:#fca5a5; }
@@ -69,55 +127,114 @@
     .row { display:flex; justify-content:space-between; align-items:center; gap:10px; margin:6px 0; }
     .row .desc { min-width:0; flex:1 1 auto; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
     .taglist { display:flex; flex-wrap:wrap; gap:6px; }
-    .tagitem { background:var(--card); border:1px dashed #2b354a; padding:4px 8px; border-radius:8px; font-size:12px; cursor:pointer; user-select:none; }
-    .search { flex:1; min-width:260px; padding:8px 12px; border-radius:10px; border:1px solid #344461; background:#0f1a2e; color:var(--text); }
+    .tagitem {
+      background:var(--card);
+      border:1px dashed #475569;
+      padding:4px 8px;
+      border-radius:8px;
+      font-size:12px;
+      cursor:pointer;
+      user-select:none;
+    }
+    .tagitem.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
 
-    /* Layout: sidebar contains controls + metrics */
-    .sidebar-section { padding:12px; display:flex; flex-direction:column; gap:10px; }
-    .sidebar-title { padding:10px 12px; border-bottom:1px solid var(--line); font-weight:600; }
+    .search {
+      min-width:260px;
+      padding:8px 12px;
+      border-radius:10px;
+      border:1px solid #64748b;
+      background:#0f172a;
+      color:var(--text);
+    }
 
-    /* Heaviness background for nodes */
-    .hx-green { background: rgba(16, 185, 129, 0.10); }  /* light green */
-    .hx-yellow { background: rgba(245, 158, 11, 0.10); } /* light yellow */
-    .hx-orange { background: rgba(234, 88, 12, 0.10); }  /* light orange */
-    .hx-red { background: rgba(239, 68, 68, 0.12); }     /* light red */
+    .sidebar-section {
+      padding:12px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .sidebar-title {
+      padding:10px 12px;
+      border-bottom:1px solid var(--line);
+      font-weight:600;
+    }
+
+    /* رنگ‌های سبک برای سنگینی */
+    .hx-green  { background: rgba(16,185,129,0.15); }
+    .hx-yellow { background: rgba(245,158,11,0.15); }
+    .hx-orange { background: rgba(234,88,12,0.15); }
+    .hx-red    { background: rgba(239,68,68,0.15); }
+
+    /* میله رنگی */
+    .progress-bar {
+      height: 6px;
+      width: 100%;
+      background: #475569;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+    }
+    .progress-good { background: var(--ok); }
+    .progress-medium { background: var(--warn); }
+    .progress-heavy { background: var(--err); }
+
+    /* آیکون‌های جدید */
+    .icon-btn {
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      user-select: none;
+    }
   </style>
 </head>
 <body>
   <div id="app">
-    <div class="panel">
-      <div class="panel-header">
-        <input id="searchInput" class="search" placeholder="Search tag, #id or .class…" />
-        <button class="btn primary" id="btnAnalyze">Analyze DOM</button>
-        <button class="btn ghost" id="btnExportJson">Export JSON</button>
-        <button class="btn ghost" id="btnExportCsv">Export CSV</button>
-        <button class="btn ghost" id="btnCollapseAll" title="Collapse/Expand all">⤢</button>
-        <span class="spacer"></span>
-        <span class="chip" id="statusChip">Idle</span>
-        <span class="small" id="statusDetail"></span>
-      </div>
-      <div class="content">
-        <div class="tree" id="tree"></div>
-      </div>
-    </div>
     <div class="sidebar">
-      <div class="sidebar-title">
-        Controls
-      </div>
+      <div class="sidebar-title">Controls</div>
       <div class="sidebar-section">
         <div id="metrics" class="metrics card"></div>
-
         <div class="card">
           <div style="display:flex; justify-content:space-between; align-items:center; gap:8px">
             <div class="small">History</div>
             <div style="display:flex; gap:8px">
               <button class="btn" id="btnSnapshot">Snapshot</button>
               <button class="btn" id="btnCompare">Compare last 2</button>
-              <button class="btn ghost" id="btnClearHistory" title="Clear history">🧹</button>
+              <button class="btn ghost icon-btn" id="btnClearHistory" title="Clear history">🗑️</button>
             </div>
           </div>
           <div id="historyList" class="taglist" style="margin-top:8px"></div>
         </div>
+        <!-- آیکون گیتهاب -->
+        <div style="margin-top:auto; text-align:center; padding:10px;">
+          <a href="https://github.com/mehdibinam/" target="_blank" style="color:var(--accent); text-decoration:none; font-size:13px;">
+            📂 GitHub
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <button class="btn primary" id="btnAnalyze">Analyze DOM</button>
+        <button class="btn ghost" id="btnExportJson">Export JSON</button>
+        <button class="btn ghost" id="btnExportCsv">Export CSV</button>
+        <input id="searchInput" class="search" placeholder="Search tag, #id or .class…" />
+        <button class="btn ghost icon-btn" id="btnCollapseAll" title="Collapse/Expand all">📶</button>
+        <span class="spacer"></span>
+        <span class="chip" id="statusChip">Idle</span>
+        <span class="small" id="statusDetail"></span>
+      </div>
+      <div class="content">
+        <div class="tree" id="tree"></div>
       </div>
     </div>
   </div>

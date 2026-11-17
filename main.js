@@ -1,4 +1,4 @@
-// main.js – DevTools panel logic (updated per requests)
+// main.js – نسخه نهایی با تمام تغییرات درخواستی
 
 const TYPES = {
   GET_DOM_DETAILS: 'GET_DOM_DETAILS',
@@ -17,7 +17,7 @@ const state = {
   filterTag: null,
 };
 
-// UI refs
+// UI
 const treeEl = document.getElementById('tree');
 const metricsEl = document.getElementById('metrics');
 const statusChip = document.getElementById('statusChip');
@@ -35,6 +35,15 @@ const btnCollapseAll = document.getElementById('btnCollapseAll');
 function setStatus(text, detail = '') {
   statusChip.textContent = text;
   statusDetail.textContent = detail;
+  if (text === 'Loading') {
+    setTimeout(() => {
+      if (state.inflight) {
+        state.inflight = false;
+        setStatus('Retry', '');
+        send(TYPES.GET_DOM_DETAILS);
+      }
+    }, 3000);
+  }
 }
 
 function send(type, data) {
@@ -70,7 +79,6 @@ function flatten(root) {
   return out;
 }
 
-// heaviness thresholds by descendantsCount
 function heavinessClass(desc) {
   if (desc >= 1000) return 'hx-red';
   if (desc >= 300) return 'hx-orange';
@@ -79,31 +87,33 @@ function heavinessClass(desc) {
 }
 
 function buildTree(node, opts = {}) {
-  const { query = '', filterTag = null, forceExpandMatches = true } = opts;
+  const { query = '', filterTag = null } = opts;
 
-  const matchesFreeText = (html) => {
+  function matchesFreeText(html) {
     if (!query) return true;
     const q = query.toLowerCase();
     const text = html.replace(/<[^>]+>/g, '').toLowerCase();
     return text.includes(q);
-  };
+  }
 
-  const matchesTag = (n) => {
+  function matchesTag(n) {
     if (!filterTag) return true;
     const t = (n.tagName || n.nodeName || '').toLowerCase();
     return t === filterTag.toLowerCase();
-  };
+  }
 
   function render(n) {
-    const hasChildren = (n.childNodes && n.childNodes.length);
+    const hasChildren = n.childNodes && n.childNodes.length;
     let childElements = [];
     let childHasMatch = false;
 
-    // Pre-render children to know if any matches exist to keep parents visible
     if (hasChildren) {
       childElements = (n.childNodes || []).map(ch => render(ch)).filter(Boolean);
       childHasMatch = childElements.length > 0;
     }
+
+    // اگر descendantsCount 0 بود و تگ هم نداشت، نمایش نده
+    if (!n.descendantsCount && !n.tagName) return null;
 
     const li = document.createElement('li');
     const header = document.createElement('div');
@@ -134,7 +144,6 @@ function buildTree(node, opts = {}) {
     let ul;
     if (hasChildren) {
       ul = document.createElement('ul');
-      // default collapsed
       ul.style.display = 'none';
       childElements.forEach(childEl => ul.appendChild(childEl));
       li.appendChild(ul);
@@ -144,15 +153,11 @@ function buildTree(node, opts = {}) {
     const passFree = matchesFreeText(html);
     const passTag = matchesTag(n) || childHasMatch;
 
-    // If a tag filter is set, keep parent chain if any descendant matches
     if (!passFree || !passTag) return childHasMatch ? li : null;
 
-    // Expand automatically when filtering to show matches
-    if (forceExpandMatches && (filterTag || query)) {
-      if (hasChildren && (matchesTag(n) || childHasMatch)) {
-        ul && (ul.style.display = '');
-        triangle.textContent = hasChildren ? '▾' : triangle.textContent;
-      }
+    if ((filterTag || query) && hasChildren && (matchesTag(n) || childHasMatch)) {
+      ul && (ul.style.display = '');
+      triangle.textContent = hasChildren ? '▾' : triangle.textContent;
     }
 
     return li;
@@ -178,21 +183,22 @@ function renderMetrics(payload) {
   const tagList = Object.entries(tagCounts)
     .sort((a,b) => b[1]-a[1])
     .slice(0, 12)
-    .map(([k,v]) => `<span class="tagitem" data-tag="${k}">${k}: ${v}</span>`)
+    .map(([k,v]) =>
+      `<span class="tagitem" data-tag="${k}">${k}: ${v}</span>`)
     .join('');
 
   const heavyList = heavyNodesTop.map(n =>
-    `<div class="row"><span class="desc">${n.desc}</span><span class="small">${n.descendantsCount}</span></div>`
-  ).join('');
+    `<div class="row"><span class="desc">${n.desc}</span><span class="small">${n.descendantsCount}</span></div>`).join('');
 
-  // Standard thresholds (#3)
-  const standards = [
-    "Total nodes ≤ 1500 (Good), 1500–3000 (Medium), >3000 (Heavy)",
-    "Max depth ≤ 25 (Good), 26–32 (Medium), >32 (Heavy)",
-    "Inline styles ≤ 100 (Good), 101–200 (Medium), >200 (Heavy)",
-  ];
-
-  const warnChip = warningLevel >= 2 ? '⚠️ Heavy' : (warningLevel === 1 ? '🟡 Medium' : '🟢 Good');
+  let level = 'Good';
+  let fillClass = 'progress-good';
+  if (warningLevel === 1) {
+    level = 'Medium';
+    fillClass = 'progress-medium';
+  } else if (warningLevel >= 2) {
+    level = 'Heavy';
+    fillClass = 'progress-heavy';
+  }
 
   metricsEl.innerHTML = `
     <div class="kpi">
@@ -201,28 +207,35 @@ function renderMetrics(payload) {
       <div class="card"><div class="small">Inline styles</div><div style="font-size:20px">${inlineStyleCount}</div></div>
       <div class="card"><div class="small">Attributes</div><div style="font-size:20px">${totalAttributes}</div></div>
     </div>
+
     <div class="card" style="margin-top:10px">
-      <div class="row"><strong>DOM status</strong><span>${warnChip}</span></div>
-      <div class="small">Standards:</div>
-      <ul class="small" style="margin-top:4px; padding-left:16px">
-        ${standards.map(s => `<li>${s}</li>`).join('')}
-      </ul>
+      <div class="row"><strong>DOM status</strong><span>${level}</span></div>
+      <div class="progress-bar"><div class="progress-bar-fill ${fillClass}" style="width:100%"></div></div>
     </div>
+
     <div class="card" style="margin-top:10px">
       <div class="row"><strong>Tag distribution (Top 12)</strong></div>
       <div class="taglist" style="margin-top:8px">${tagList || '<span class="small">—</span>'}</div>
     </div>
+
     <div class="card" style="margin-top:10px">
       <div class="row"><strong>Heaviest nodes (by descendants)</strong><span class="small">Top 10</span></div>
       <div style="margin-top:8px">${heavyList || '<span class="small">—</span>'}</div>
     </div>
   `;
 
-  // (#10) Delegate click: when clicking a tag pill, expand nodes with that tag
   metricsEl.querySelectorAll('.tagitem[data-tag]').forEach(el => {
     el.addEventListener('click', () => {
-      state.filterTag = el.getAttribute('data-tag');
-      searchInput.value = ''; // reset text search
+      const tag = el.getAttribute('data-tag');
+      if (state.filterTag === tag) {
+        state.filterTag = null;
+        el.classList.remove('active');
+      } else {
+        state.filterTag = tag;
+        metricsEl.querySelectorAll('.tagitem.active').forEach(x => x.classList.remove('active'));
+        el.classList.add('active');
+      }
+      searchInput.value = '';
       if (!state.dom) return;
       treeEl.innerHTML = '';
       treeEl.appendChild(buildTree(state.dom, { query: '', filterTag: state.filterTag }));
@@ -240,7 +253,7 @@ function buildCsv(flat) {
     n.id ?? '',
     (n.class ?? '').toString().replace(/\s+/g,'.'),
     n.descendantsCount ?? 0,
-    (n.attributesArr?.length || 0),
+    n.attributesArr?.length || 0,
     n.depth ?? ''
   ]);
   return [header, ...rows].map(r => r.map(x => `"${String(x).replace(/"/g,'""')}"`).join(',')).join('\n');
@@ -248,23 +261,19 @@ function buildCsv(flat) {
 
 function renderHistory() {
   historyList.innerHTML = state.snapshots
-    .map((s, idx) => `<span class="tagitem">#${idx+1} nodes:${s.metrics.totalNodes} depth:${s.metrics.maxDepth}</span>`)
+    .map((s, idx) =>
+      `<span class="tagitem">#${idx+1} nodes:${s.metrics.totalNodes} depth:${s.metrics.maxDepth}</span>`)
     .join('');
 }
 
-// --- Handlers
 port.onMessage.addListener((msg) => {
   const { type, data, src } = msg || {};
   if (type === TYPES.GET_DOM_DETAILS && src === 'injected-script') {
     const { dom, metrics } = data;
     state.dom = dom;
     state.flat = flatten(dom);
-
-    // (#5) Clean status: no "Success / nodes / depth" verbosity
     setStatus('Done', '');
     state.inflight = false;
-
-    // render tree
     treeEl.innerHTML = '';
     const q = searchInput.value.trim();
     treeEl.appendChild(buildTree(dom, { query: q, filterTag: state.filterTag }));
@@ -272,25 +281,14 @@ port.onMessage.addListener((msg) => {
   }
 });
 
-// Initial ping to ensure wiring
 send(TYPES.PING);
 
-// UI events
 btnAnalyze.onclick = () => {
-  if (state.inflight) return; // prevent double-press lock
+  if (state.inflight) return;
   state.inflight = true;
-  state.filterTag = null; // reset filter
+  state.filterTag = null;
   setStatus('Loading', '');
   send(TYPES.GET_DOM_DETAILS);
-
-  // safety timeout to avoid "stuck loading" (#2)
-  setTimeout(() => {
-    if (state.inflight) {
-      state.inflight = false;
-      setStatus('Retrying...', '');
-      send(TYPES.GET_DOM_DETAILS);
-    }
-  }, 4000);
 };
 
 btnExportJson.onclick = () => {
@@ -332,7 +330,8 @@ btnClearHistory.onclick = () => {
 };
 
 searchInput.addEventListener('input', () => {
-  state.filterTag = null; // text search cancels tag filter
+  state.filterTag = null;
+  metricsEl.querySelectorAll('.tagitem.active').forEach(x => x.classList.remove('active'));
   if (!state.dom) return;
   treeEl.innerHTML = '';
   treeEl.appendChild(buildTree(state.dom, { query: searchInput.value.trim() }));
@@ -340,10 +339,9 @@ searchInput.addEventListener('input', () => {
 
 let collapsedAll = true;
 btnCollapseAll.addEventListener('click', () => {
-  if (!treeEl) return;
   const uls = treeEl.querySelectorAll('ul');
   uls.forEach(ul => {
-    if (ul === treeEl.firstElementChild) return; // keep root controlled via triangle
+    if (ul === treeEl.firstElementChild) return;
     ul.style.display = collapsedAll ? '' : 'none';
   });
   treeEl.querySelectorAll('.node > span:first-child').forEach(tri => {
